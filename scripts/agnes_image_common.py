@@ -145,17 +145,18 @@ def run_text_to_image(api_key, model, prompt, size, quality, response_format, ou
 
 
 def run_image_to_image(api_key, model, prompt, image_data, size, quality, response_format, output_path):
-    """图生图：image_data 可以是本地路径或 data URL，在调用前由脚本决定。"""
+    """图生图：image_data 是 data URI（data:image/xxx;base64,...）或 URL。
+    Agnes Image 2.1 Flash API 要求 image 放在 extra_body.image 数组中。"""
     payload = {
         "model": model,
         "prompt": prompt,
-        "image": image_data,
         "size": size,
         "quality": quality,
         "n": 1,
+        "extra_body": {"image": [image_data]},
     }
     if response_format:
-        payload["response_format"] = response_format
+        payload["extra_body"]["response_format"] = response_format
 
     print(f"🎨 图生图任务")
     print(f"   提示词: {prompt[:80]}{'...' if len(prompt) > 80 else ''}")
