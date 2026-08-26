@@ -81,3 +81,6 @@ output/
 htmlcov/
 *.pid
 *.seed
+
+# 本地 agent / 记忆状态（不提交到 GitHub）
+.workbuddy/
