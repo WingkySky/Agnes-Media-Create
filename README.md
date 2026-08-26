@@ -22,9 +22,9 @@
 
 ---
 
-**A modular CLI toolkit for generating media content using the Agnes Image 2.1 Flash and Agnes Video V2.0 APIs.**
+**A modular CLI toolkit for generating media content using the Agnes Image 2.1 Flash, Agnes Video V2.0, and Agnes Video 2.5 / 2.5 Flash APIs.**
 
-This is not just a single script. It's a complete system featuring a three-layer architecture: common utilities (`.env` auto-loading, HTTP requests, file downloading, parameter validation), API-specific encapsulation (image & video endpoints with response parsing), and standalone function scripts (text-to-image, image-to-image, text-to-video, and image-to-video with multi-image/keyframe animation).
+This is not just a single script. It's a complete system featuring a three-layer architecture: common utilities (`.env` auto-loading, HTTP requests, file downloading, parameter validation), API-specific encapsulation (image & video endpoints with response parsing), and standalone function scripts (text-to-image, image-to-image, text-to-video V2.0, and image-to-video V2.0 with multi-image/keyframe animation; plus 2.5-series scripts for text-to-video and keyframe / multimodal-reference video generation).
 
 Designed for developers who want clean, production-ready scripts that just work — with zero setup friction and no OpenAI SDK dependency.
 
@@ -40,6 +40,9 @@ Designed for developers who want clean, production-ready scripts that just work 
 | 🖼️**Image-to-Image** | Modify existing images based on prompts + input image                                        | `agnes_image_to_image.py` |
 | 🎬**Text-to-Video**    | Generate videos from text prompts (async with auto-polling)                                  | `agnes_text_to_video.py`  |
 | 🎬**Image-to-Video**   | Generate videos from input images — single image, multi-image, and keyframe animation modes | `agnes_image_to_video.py` |
+| 🎬**Text-to-Video 2.5 (mode=text)** | Based on `agnes-video-2.5` / `agnes-video-2.5-flash`, by seconds / size tier / aspect ratio | `agnes_text_to_video_25.py` |
+| 🎬**Keyframe 2.5 (mode=keyframe)** | First/last frame control (at least one) for precise start/end frames | `agnes_image_to_video_25.py` |
+| 🎬**Multimodal Reference 2.5 (mode=reference)** | Reference images / audio / video; prompt uses `<Picture N>` / `<Audio N>` / `<Video N>` | `agnes_image_to_video_25.py` |
 
 ### Architecture Highlights
 
@@ -65,16 +68,21 @@ agnes-media-create/
 ├── scripts/
 │   ├── agnes_common.py                   # Common utilities — .env / HTTP / download / paths
 │   ├── agnes_image_common.py             # Image API encapsulation
-│   ├── agnes_video_common.py             # Video API encapsulation (async + polling)
+│   ├── agnes_video_common.py             # Video V2.0 API encapsulation (async + polling)
+│   ├── agnes_video_v25_common.py         # Video 2.5 / 2.5 Flash API encapsulation (mode / seconds / size / aspect_ratio)
 │   ├── agnes_text_to_image.py            # Text-to-Image standalone script
 │   ├── agnes_image_to_image.py           # Image-to-Image standalone script
-│   ├── agnes_text_to_video.py            # Text-to-Video standalone script
-│   └── agnes_image_to_video.py           # Image-to-Video standalone script (multi-image / keyframes)
+│   ├── agnes_text_to_video.py            # Text-to-Video V2.0 standalone script
+│   ├── agnes_image_to_video.py           # Image-to-Video V2.0 standalone script (multi-image / keyframes)
+│   ├── agnes_text_to_video_25.py         # Text-to-Video 2.5 standalone script (mode=text)
+│   └── agnes_image_to_video_25.py        # Keyframe / reference video 2.5 standalone script (mode=keyframe / reference)
 └── output/
     ├── image/text-to-image/              # Text-to-Image outputs
     ├── image/image-to-image/             # Image-to-Image outputs
-    ├── video/text-to-video/              # Text-to-Video outputs
-    └── video/image-to-video/             # Image-to-Video outputs
+    ├── video/text-to-video/              # Text-to-Video V2.0 outputs
+    ├── video/image-to-video/             # Image-to-Video V2.0 outputs
+    ├── video/text-to-video-v25/          # Text-to-Video 2.5 outputs
+    └── video/image-to-video-v25/         # Keyframe / reference video 2.5 outputs
 ```
 
 ---
@@ -208,6 +216,43 @@ Supports three input modes:
 
 > ⚠️ **Note:** Agnes Video API requires publicly accessible image URLs for image-to-video. Local file paths are not supported.
 
+### Video 2.5 / 2.5 Flash (recommended new models)
+
+`agnes-video-2.5` and `agnes-video-2.5-flash` share an OpenAI Videos-compatible interface using the `mode / seconds / size / aspect_ratio` parameter scheme, which is incompatible with V2.0 (`num_frames` / `frame_rate` / `width` / `height`).
+
+```bash
+# Text-to-Video (text)
+python scripts/agnes_text_to_video_25.py "Future city aerial, neon and mist" \
+    --model agnes-video-2.5 --seconds 10 --size 2K --aspect-ratio 21:9
+
+# Keyframe control (keyframe)
+python scripts/agnes_image_to_video_25.py "Character turns and walks to the window" --mode keyframe \
+    --first-frame https://example.com/first.png --last-frame https://example.com/last.png
+
+# Multimodal reference (reference): images / audio / video
+python scripts/agnes_image_to_video_25.py "Run through the flower field as <Picture 1>" --mode reference \
+    --image https://example.com/character.png
+python scripts/agnes_image_to_video_25.py "Move to the rhythm of <Audio 1>" --mode reference \
+    --image https://example.com/subject.png --audio https://example.com/music.mp3
+python scripts/agnes_image_to_video_25.py "Change <Video 1> scene to a moonlit bedroom" --mode reference \
+    --video https://example.com/input.mp4 --video-start 35
+```
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--model` | `agnes-video-2.5` or `agnes-video-2.5-flash` | `agnes-video-2.5` |
+| `--seconds` | Duration, string `"4"`–`"12"` | `5` |
+| `--size` | Size tier `720P` / `960P` / `2K` (Flash only `720P`) | `720P` |
+| `--aspect-ratio` | Aspect ratio `21:9` / `16:9` / `4:3` / `1:1` / `3:4` / `9:16` | `16:9` |
+| `--mode` (image script) | `keyframe` (first/last frame) / `reference` (multimodal) | required |
+| `--first-frame` / `--last-frame` | First/last frame image URL (keyframe, at least one) | none |
+| `--image` / `--audio` / `--video` | Reference image / audio / video URL (reference, repeatable) | none |
+| `--video-start` / `--video-require-audio` | Reference video start second (default 0) / require audio track | `0` / off |
+
+> **Flash-specific constraints**: `size` only `720P`; `reference.images` max 5; `reference` does not support `videos`. Violations are rejected by the script directly (no task created, no charge). Flash is currently free during a promotional period.
+
+> ⚠️ **Note:** All media URLs in `keyframe` / `reference` modes must be publicly accessible and remain valid until the task completes; `reference` prompts reference the Nth asset with `<Picture N>` / `<Audio N>` / `<Video N>` (1-indexed).
+
 ---
 
 ## 📋 API Details
@@ -222,6 +267,8 @@ Supports three input modes:
 
 ### Video API
 
+#### V2.0
+
 - **Base URL**: `https://api.agnes-ai.com/v1/videos`
 - **Model**: `agnes-video-v2.0`
 - **Flow**:
@@ -229,6 +276,16 @@ Supports three input modes:
   2. `GET /v1/videos/{video_id}` → polls for completion status
   3. Status progresses: `in_progress` → `completed`
   4. Download video from the returned URL
+- **Auth**: Bearer token via `Authorization: Bearer $AGNES_API_KEY`
+
+#### 2.5 / 2.5 Flash
+
+- **Base URL**: `https://apihub.agnes-ai.com/v1`
+- **Models**: `agnes-video-2.5` / `agnes-video-2.5-flash`
+- **Create**: `POST /v1/videos` → returns `task_id` / `id` / `video_id`, `status` is `queued`
+- **Query**: `GET /agnesapi?video_id=<VIDEO_ID>&model_name=agnes-video-2.5` (pass `model_name` for all modes)
+- **Complete**: when `status=completed`, get the video URL from `metadata.url` and download; on `status=failed`, inspect `error.message`
+- **Modes**: `text` (text-to-video) / `keyframe` (`first_frame` / `last_frame`) / `reference` (`images` / `audios` / `videos`, prompt references via `<Picture N>` / `<Audio N>` / `<Video N>`)
 - **Auth**: Bearer token via `Authorization: Bearer $AGNES_API_KEY`
 
 ---
@@ -240,12 +297,15 @@ agnes_text_to_image.py
 agnes_image_to_image.py  }  Standalone function scripts (CLI layer)
 agnes_text_to_video.py
 agnes_image_to_video.py
+agnes_text_to_video_25.py    }  Video 2.5 series scripts
+agnes_image_to_video_25.py
 
          │
          ▼
 
 agnes_image_common.py    }  API-specific encapsulation (Business logic layer)
-agnes_video_common.py
+agnes_video_common.py        (V2.0)
+agnes_video_v25_common.py    (2.5 / 2.5 Flash)
 
          │
          ▼
@@ -254,8 +314,8 @@ agnes_common.py          }  Common utilities (Foundation layer)
 ```
 
 - **Foundation (`agnes_common.py`)** — `.env` auto-loading, API key resolution, HTTP requests, file downloading, path management, parameter validation. Shared by all scripts.
-- **Business logic (`agnes_image_common.py` / `agnes_video_common.py`)** — Encapsulates image and video API call flows, response parsing, and parameter validation (such as the video `8n+1` frame count rule).
-- **CLI layer (4 standalone scripts)** — Each script only parses command-line arguments and calls the corresponding business logic — one script, one job.
+- **Business logic (`agnes_image_common.py` / `agnes_video_common.py` / `agnes_video_v25_common.py`)** — Encapsulates image, video V2.0, and video 2.5 API call flows, response parsing, and parameter validation (V2.0 `8n+1` frame rule; V2.5 seconds / size / aspect_ratio / Flash constraints).
+- **CLI layer (6 standalone scripts)** — Each script only parses command-line arguments and calls the corresponding business logic — one script, one job.
 
 ---
 

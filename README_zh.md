@@ -22,9 +22,9 @@
 
 ---
 
-**一个使用 Agnes Image 2.1 Flash 与 Agnes Video V2.0 API 生成媒体内容的模块化命令行工具包。**
+**一个使用 Agnes Image 2.1 Flash、Agnes Video V2.0 与 Agnes Video 2.5 / 2.5 Flash API 生成媒体内容的模块化命令行工具包。**
 
-这不仅仅是一个脚本。它是一个完整的系统，采用三层架构设计：通用工具（`.env` 自动加载、HTTP 请求、文件下载、参数校验）、API 专属封装（图片与视频接口及响应解析）、独立功能脚本（文生图、图生图、文生视频，以及支持多图/关键帧动画的图生视频）。
+这不仅仅是一个脚本。它是一个完整的系统，采用三层架构设计：通用工具（`.env` 自动加载、HTTP 请求、文件下载、参数校验）、API 专属封装（图片与视频接口及响应解析）、独立功能脚本（文生图、图生图、文生视频 V2.0，以及支持多图/关键帧动画的图生视频 V2.0；另有基于 2.5 系列的文生视频与首尾帧/多模态参考脚本）。
 
 专为追求简洁、生产级脚本的开发者而设计 —— 零配置摩擦，无 OpenAI SDK 依赖，开箱即用。
 
@@ -40,6 +40,9 @@
 | 🖼️**图生图 (Image-to-Image)** | 根据输入图片与提示词修改现有图片                         | `agnes_image_to_image.py` |
 | 🎬**文生视频 (Text-to-Video)**  | 根据文本提示词生成视频（异步任务 + 自动轮询）            | `agnes_text_to_video.py`  |
 | 🎬**图生视频 (Image-to-Video)** | 根据输入图片生成视频 —— 支持单图、多图与关键帧动画模式 | `agnes_image_to_video.py` |
+| 🎬**文生视频 2.5 (mode=text)** | 基于 `agnes-video-2.5` / `agnes-video-2.5-flash`，按秒数 / 分辨率档位 / 画幅生成 | `agnes_text_to_video_25.py` |
+| 🎬**首尾帧 2.5 (mode=keyframe)** | 提供首帧 / 尾帧（至少其一）精确控制起止画面 | `agnes_image_to_video_25.py` |
+| 🎬**多模态参考 2.5 (mode=reference)** | 以图片 / 音频 / 视频作参考，提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用 | `agnes_image_to_video_25.py` |
 
 ### 架构亮点
 
@@ -65,16 +68,21 @@ agnes-media-create/
 ├── scripts/
 │   ├── agnes_common.py                   # 通用工具 —— .env / HTTP / 下载 / 路径
 │   ├── agnes_image_common.py             # 图片 API 封装
-│   ├── agnes_video_common.py             # 视频 API 封装（异步 + 轮询）
+│   ├── agnes_video_common.py             # 视频 V2.0 API 封装（异步 + 轮询）
+│   ├── agnes_video_v25_common.py         # 视频 2.5 / 2.5 Flash API 封装（mode / seconds / size / aspect_ratio）
 │   ├── agnes_text_to_image.py            # 文生图独立脚本
 │   ├── agnes_image_to_image.py           # 图生图独立脚本
-│   ├── agnes_text_to_video.py            # 文生视频独立脚本
-│   └── agnes_image_to_video.py           # 图生视频独立脚本（多图 / 关键帧）
+│   ├── agnes_text_to_video.py            # 文生视频 V2.0 独立脚本
+│   ├── agnes_image_to_video.py           # 图生视频 V2.0 独立脚本（多图 / 关键帧）
+│   ├── agnes_text_to_video_25.py         # 文生视频 2.5 独立脚本（mode=text）
+│   └── agnes_image_to_video_25.py        # 图生/参考视频 2.5 独立脚本（mode=keyframe / reference）
 └── output/
     ├── image/text-to-image/              # 文生图输出目录
     ├── image/image-to-image/             # 图生图输出目录
-    ├── video/text-to-video/              # 文生视频输出目录
-    └── video/image-to-video/             # 图生视频输出目录
+    ├── video/text-to-video/              # 文生视频 V2.0 输出目录
+    ├── video/image-to-video/             # 图生视频 V2.0 输出目录
+    ├── video/text-to-video-v25/          # 文生视频 2.5 输出目录
+    └── video/image-to-video-v25/         # 首尾帧 / 多模态参考 2.5 输出目录
 ```
 
 ---
@@ -208,6 +216,43 @@ python scripts/agnes_image_to_video.py "提示词" --image URL [选项]
 
 > ⚠️ **注意：** Agnes Video API 的图生视频需要图片为**公网可访问的 URL**。不支持本地文件路径。
 
+### 视频 2.5 / 2.5 Flash（推荐新模型）
+
+`agnes-video-2.5` 与 `agnes-video-2.5-flash` 共用 OpenAI Videos 兼容接口，参数体系为 `mode / seconds / size / aspect_ratio`，与 V2.0（num_frames / frame_rate / width / height）互不兼容。
+
+```bash
+# 文生视频（text）
+python scripts/agnes_text_to_video_25.py "未来城市航拍，霓虹与雨雾" \
+    --model agnes-video-2.5 --seconds 10 --size 2K --aspect-ratio 21:9
+
+# 首尾帧控制（keyframe）
+python scripts/agnes_image_to_video_25.py "人物自然转身走向窗边" --mode keyframe \
+    --first-frame https://example.com/first.png --last-frame https://example.com/last.png
+
+# 多模态参考（reference）：图片 / 音频 / 视频
+python scripts/agnes_image_to_video_25.py "以 <Picture 1> 的角色在花田奔跑" --mode reference \
+    --image https://example.com/character.png
+python scripts/agnes_image_to_video_25.py "按 <Audio 1> 节奏运动" --mode reference \
+    --image https://example.com/subject.png --audio https://example.com/music.mp3
+python scripts/agnes_image_to_video_25.py "参考 <Video 1> 改成月夜卧室" --mode reference \
+    --video https://example.com/input.mp4 --video-start 35
+```
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `--model` | `agnes-video-2.5` 或 `agnes-video-2.5-flash` | `agnes-video-2.5` |
+| `--seconds` | 视频时长，字符串 `"4"`–`"12"` | `5` |
+| `--size` | 分辨率档位 `720P` / `960P` / `2K`（Flash 仅 `720P`） | `720P` |
+| `--aspect-ratio` | 画幅 `21:9` / `16:9` / `4:3` / `1:1` / `3:4` / `9:16` | `16:9` |
+| `--mode`（图生脚本） | `keyframe`（首尾帧）/ `reference`（多模态参考） | 必填 |
+| `--first-frame` / `--last-frame` | 首帧 / 尾帧图片 URL（keyframe，至少其一） | 无 |
+| `--image` / `--audio` / `--video` | 参考图片 / 音频 / 视频 URL（reference，可重复） | 无 |
+| `--video-start` / `--video-require-audio` | 参考视频起始秒（默认 0）/ 要求原片带音轨 | `0` / 关闭 |
+
+> **Flash 专属约束**：`size` 仅 `720P`；`reference.images` 最多 5 张；`reference` 不支持 `videos`。违反时脚本直接拒绝（不创建任务、不计费）。当前 Flash 限时免费。
+
+> ⚠️ **注意：** `keyframe` / `reference` 模式下的所有媒体 URL 必须公网可访问，且在任务完成前保持有效；`reference` 提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用第 N 个素材（从 1 计数）。
+
 ---
 
 ## 📋 API 详情
@@ -222,6 +267,8 @@ python scripts/agnes_image_to_video.py "提示词" --image URL [选项]
 
 ### 视频 API
 
+#### V2.0
+
 - **基础地址**：`https://api.agnes-ai.com/v1/videos`
 - **模型**：`agnes-video-v2.0`
 - **流程**：
@@ -229,6 +276,16 @@ python scripts/agnes_image_to_video.py "提示词" --image URL [选项]
   2. `GET /v1/videos/{video_id}` → 轮询完成状态
   3. 状态变化：`in_progress` → `completed`
   4. 从返回的 URL 下载视频
+- **认证**：通过 `Authorization: Bearer $AGNES_API_KEY` 传递 Bearer token
+
+#### 2.5 / 2.5 Flash
+
+- **基础地址**：`https://apihub.agnes-ai.com/v1`
+- **模型**：`agnes-video-2.5` / `agnes-video-2.5-flash`
+- **创建**：`POST /v1/videos` → 返回 `task_id` / `id` / `video_id`，`status` 为 `queued`
+- **查询**：`GET /agnesapi?video_id=<VIDEO_ID>&model_name=agnes-video-2.5`（所有模式都带 `model_name` 推荐）
+- **完成**：`status=completed` 时从 `metadata.url` 获取视频地址下载；`status=failed` 时查看 `error.message`
+- **模式**：`text`（文生视频）/ `keyframe`（首尾帧，传 `first_frame` / `last_frame`）/ `reference`（传 `images` / `audios` / `videos`，提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用）
 - **认证**：通过 `Authorization: Bearer $AGNES_API_KEY` 传递 Bearer token
 
 ---
@@ -240,12 +297,15 @@ agnes_text_to_image.py
 agnes_image_to_image.py  }  独立功能脚本（CLI 层）
 agnes_text_to_video.py
 agnes_image_to_video.py
+agnes_text_to_video_25.py    }  视频 2.5 系列脚本
+agnes_image_to_video_25.py
 
          │
          ▼
 
 agnes_image_common.py    }  API 专属封装（业务逻辑层）
-agnes_video_common.py
+agnes_video_common.py        （V2.0）
+agnes_video_v25_common.py    （2.5 / 2.5 Flash）
 
          │
          ▼
@@ -254,8 +314,8 @@ agnes_common.py          }  通用工具（底层基础层）
 ```
 
 - **底层（`agnes_common.py`）** —— `.env` 自动加载、API Key 解析、HTTP 请求、文件下载、路径管理、参数校验。所有脚本共享。
-- **业务逻辑层（`agnes_image_common.py` / `agnes_video_common.py`）** —— 分别封装图片与视频的 API 调用流程、响应解析，以及参数校验（如视频 `8n+1` 帧数规则）。
-- **CLI 层（4 个独立脚本）** —— 每个脚本只负责解析命令行参数并调用对应业务逻辑 —— 一个脚本，一件事。
+- **业务逻辑层（`agnes_image_common.py` / `agnes_video_common.py` / `agnes_video_v25_common.py`）** —— 分别封装图片、视频 V2.0、视频 2.5 的 API 调用流程、响应解析，以及参数校验（V2.0 的 `8n+1` 帧数规则；V2.5 的 seconds / size / aspect_ratio / Flash 约束）。
+- **CLI 层（6 个独立脚本）** —— 每个脚本只负责解析命令行参数并调用对应业务逻辑 —— 一个脚本，一件事。
 
 ---
 
