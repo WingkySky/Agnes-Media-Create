@@ -249,7 +249,7 @@ python scripts/agnes_image_to_video_25.py "参考 <Video 1> 改成月夜卧室" 
 | `--image` / `--audio` / `--video` | 参考图片 / 音频 / 视频 URL（reference，可重复） | 无 |
 | `--video-start` / `--video-require-audio` | 参考视频起始秒（默认 0）/ 要求原片带音轨 | `0` / 关闭 |
 
-> **Flash 专属约束**：`size` 仅 `720P`；`reference.images` 最多 5 张；`reference` 不支持 `videos`。违反时脚本直接拒绝（不创建任务、不计费）。当前 Flash 限时免费。
+> **Flash 专属约束**：`size` 仅 `720P`；`reference.images` 最多 5 张、`reference.audios` 最多 3 段；`reference` 不支持 `videos`。违反时脚本直接拒绝（不创建任务、不计费）。原价 $0.025 / 秒，当前限时免费（现价 $0 / 秒）。
 
 > ⚠️ **注意：** `keyframe` / `reference` 模式下的所有媒体 URL 必须公网可访问，且在任务完成前保持有效；`reference` 提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用第 N 个素材（从 1 计数）。
 
@@ -284,7 +284,7 @@ python scripts/agnes_image_to_video_25.py "参考 <Video 1> 改成月夜卧室" 
 - **模型**：`agnes-video-2.5` / `agnes-video-2.5-flash`
 - **创建**：`POST /v1/videos` → 返回 `task_id` / `id` / `video_id`，`status` 为 `queued`
 - **查询**：`GET /agnesapi?video_id=<VIDEO_ID>&model_name=agnes-video-2.5`（所有模式都带 `model_name` 推荐）
-- **完成**：`status=completed` 时从 `metadata.url` 获取视频地址下载；`status=failed` 时查看 `error.message`
+- **完成**：`status=completed` 时从响应顶层 `url` 字段获取视频地址下载（兼容旧的 `metadata.url`）；`status=failed` 时查看 `error.message`
 - **模式**：`text`（文生视频）/ `keyframe`（首尾帧，传 `first_frame` / `last_frame`）/ `reference`（传 `images` / `audios` / `videos`，提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用）
 - **认证**：通过 `Authorization: Bearer $AGNES_API_KEY` 传递 Bearer token
 

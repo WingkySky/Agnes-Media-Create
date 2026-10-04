@@ -249,7 +249,7 @@ python scripts/agnes_image_to_video_25.py "Change <Video 1> scene to a moonlit b
 | `--image` / `--audio` / `--video` | Reference image / audio / video URL (reference, repeatable) | none |
 | `--video-start` / `--video-require-audio` | Reference video start second (default 0) / require audio track | `0` / off |
 
-> **Flash-specific constraints**: `size` only `720P`; `reference.images` max 5; `reference` does not support `videos`. Violations are rejected by the script directly (no task created, no charge). Flash is currently free during a promotional period.
+> **Flash-specific constraints**: `size` only `720P`; `reference.images` max 5 and `reference.audios` max 3; `reference` does not support `videos`. Violations are rejected by the script directly (no task created, no charge). List price $0.025/s, currently free during a promotional period ($0/s).
 
 > ⚠️ **Note:** All media URLs in `keyframe` / `reference` modes must be publicly accessible and remain valid until the task completes; `reference` prompts reference the Nth asset with `<Picture N>` / `<Audio N>` / `<Video N>` (1-indexed).
 
@@ -284,7 +284,7 @@ python scripts/agnes_image_to_video_25.py "Change <Video 1> scene to a moonlit b
 - **Models**: `agnes-video-2.5` / `agnes-video-2.5-flash`
 - **Create**: `POST /v1/videos` → returns `task_id` / `id` / `video_id`, `status` is `queued`
 - **Query**: `GET /agnesapi?video_id=<VIDEO_ID>&model_name=agnes-video-2.5` (pass `model_name` for all modes)
-- **Complete**: when `status=completed`, get the video URL from `metadata.url` and download; on `status=failed`, inspect `error.message`
+- **Complete**: when `status=completed`, get the video URL from the top-level `url` field (legacy `metadata.url` also supported); on `status=failed`, inspect `error.message`
 - **Modes**: `text` (text-to-video) / `keyframe` (`first_frame` / `last_frame`) / `reference` (`images` / `audios` / `videos`, prompt references via `<Picture N>` / `<Audio N>` / `<Video N>`)
 - **Auth**: Bearer token via `Authorization: Bearer $AGNES_API_KEY`
 

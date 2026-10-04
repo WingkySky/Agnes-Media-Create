@@ -7,7 +7,7 @@ Agnes Video 2.5 / 2.5 Flash - 视频生成公共模块
   - GET  /agnesapi?video_id=xxx&model_name=xxx  轮询结果（V2.5 推荐，所有模式都带 model_name）
   - 提取 metadata.url 并下载
   - mode（text / keyframe / reference）与尺寸、画幅、时长的专用校验
-  - Flash 专属约束（size 仅 720P / 参考图最多 5 张 / 不支持参考视频）
+  - Flash 专属约束（size 仅 720P / 参考图最多 5 张 / 参考音频最多 3 段 / 不支持参考视频）
 
 与 agnes_video_common.py（V2.0）的区别：
   V2.0 使用 num_frames / frame_rate / width / height / image；
@@ -47,8 +47,9 @@ V25_DEFAULT_SECONDS = "5"
 V25_SECONDS_MIN = 4
 V25_SECONDS_MAX = 12
 
-# Flash 专属约束
+# Flash 专属约束（校验失败不创建任务、不计费）
 FLASH_MAX_IMAGES = 5
+FLASH_MAX_AUDIOS = 3
 
 # 输出目录
 OUTPUT_BASE_VIDEO = "output/video"
@@ -232,6 +233,7 @@ def add_v25_common_args(p):
     p.add_argument("--aspect-ratio", default="16:9",
                    help="画幅比例：21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16")
     p.add_argument("--seed", type=int, default=None, help="随机种子（可选，相同种子提高可复现性）")
-    p.add_argument("--poll-interval", type=int, default=3, help="轮询间隔秒数（默认 3）")
+    p.add_argument("--poll-interval", type=int, default=2,
+                   help="轮询间隔秒数（默认 2，官方建议 1-2 秒）")
     p.add_argument("--max-wait", type=int, default=600, help="最长等待秒数（默认 600）")
     return p

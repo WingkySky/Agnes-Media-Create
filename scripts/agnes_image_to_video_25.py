@@ -9,7 +9,8 @@ Agnes Video 2.5 / 2.5 Flash - 图生视频 / 关键帧 / 多模态参考
 
 注意：
   - 所有图片/音频/视频 URL 必须公网可访问，且在任务完成前保持有效。
-  - Flash 模型（agnes-video-2.5-flash）限制：size 仅 720P、images 最多 5 张、不支持参考视频。
+  - Flash 模型（agnes-video-2.5-flash）限制：size 仅 720P、images 最多 5 张、
+    audios 最多 3 段、不支持参考视频；违反时脚本直接拒绝，不创建任务、不计费。
 
 用法：
   # 首尾帧控制
@@ -78,7 +79,7 @@ def main():
     parser.add_argument("--image", "-i", action="append", default=None,
                         help="参考图片 URL（可重复，reference 模式；Flash 最多 5 张）")
     parser.add_argument("--audio", "-a", action="append", default=None,
-                        help="参考音频 URL（可重复，reference 模式）")
+                        help="参考音频 URL（可重复，reference 模式；Flash 最多 3 段）")
     parser.add_argument("--video", "-v", action="append", default=None,
                         help="参考视频 URL（可重复，reference 模式；Flash 不支持）")
     parser.add_argument("--video-start", type=int, default=0,
@@ -142,14 +143,18 @@ def main():
             print("❌ reference 模式不允许传入 first_frame / last_frame")
             sys.exit(1)
 
-        # Flash 专属校验
+        # Flash 专属校验（按官方错误检测顺序：size → images → audios → videos）
         if args.model == v25.FLASH_VIDEO_V25_MODEL:
-            if videos:
-                print("❌ agnes-video-2.5-flash 不支持参考视频（videos）")
-                sys.exit(1)
             if len(images) > v25.FLASH_MAX_IMAGES:
                 print(f"❌ agnes-video-2.5-flash 的 images 最多 {v25.FLASH_MAX_IMAGES} 张"
                       f"（收到 {len(images)} 张）")
+                sys.exit(1)
+            if len(audios) > v25.FLASH_MAX_AUDIOS:
+                print(f"❌ agnes-video-2.5-flash 的 audios 最多 {v25.FLASH_MAX_AUDIOS} 段"
+                      f"（收到 {len(audios)} 段）")
+                sys.exit(1)
+            if videos:
+                print("❌ agnes-video-2.5-flash 不支持参考视频（videos）")
                 sys.exit(1)
 
         if images:

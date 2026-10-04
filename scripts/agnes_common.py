@@ -15,32 +15,19 @@ Agnes - 统一公共模块
 所有图像脚本和视频脚本都应从本模块导入。
 """
 
+import ipaddress
 import os
+import socket
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 try:
     import requests
 except ImportError:
     print("Error: 'requests' package is required. Install with: pip install requests")
     sys.exit(1)
-
-# ─── 全局配置 ────────────────────────────────────────────────────────────
-
-DEFAULT_BASE_URL = "https://apihub.agnes-ai.com/v1"
-DEFAULT_API_KEY_ENV = "AGNES_API_KEY"
-PLATFORM_URL = "https://platform.agnes-ai.com"
-
-# 统一 User-Agent，用于请求与下载
-_USER_AGENT = "Mozilla/5.0 Agnes-CLI/1.0"
-
-# 本项目根目录（scripts/ 的父目录），用作输出文件的默认落点，
-# 避免被其他 agent 从外部目录调用时把文件散落到调用方项目中。
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# 默认输出根目录（始终相对于本项目，而非 cwd）
-DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "output"
-
 
 # ─── 1. .env 文件自动加载 ─────────────────────────────────────────────
 
@@ -89,8 +76,27 @@ def load_dotenv(override=False):
         return None
 
 
-# 模块被导入时自动执行一次 .env 加载（不覆盖显式 export 的变量）
+# 模块被导入时自动执行一次 .env 加载（不覆盖显式 export 的变量）。
+# 必须在读取 AGNES_BASE_URL 等环境配置之前完成。
 _LOADED_ENV_FILE = load_dotenv(override=False)
+
+
+# ─── 全局配置 ────────────────────────────────────────────────────────────
+
+_DEFAULT_BASE_URL = "https://apihub.agnes-ai.com/v1"
+# 支持通过环境变量 / .env 覆盖 API 基础地址（与官方文档的 AGNES_BASE_URL 对齐）
+DEFAULT_BASE_URL = os.environ.get("AGNES_BASE_URL", "").strip() or _DEFAULT_BASE_URL
+DEFAULT_API_KEY_ENV = "AGNES_API_KEY"
+PLATFORM_URL = "https://platform.agnes-ai.com"
+
+# 统一 User-Agent，用于请求与下载
+_USER_AGENT = "Mozilla/5.0 Agnes-CLI/1.0"
+
+# 本项目根目录（scripts/ 的父目录），用作输出文件的默认落点，
+# 避免被其他 agent 从外部目录调用时把文件散落到调用方项目中。
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# 默认输出根目录（始终相对于本项目，而非 cwd）
+DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "output"
 
 
 # ─── 2. 统一 API Key 获取 ─────────────────────────────────────────
@@ -116,6 +122,61 @@ def get_api_key(args_key=None):
 
 # ─── 3. HTTP 头构造与请求发送 ──────────────────────────────────────
 
+# host 校验结果缓存（进程内），避免轮询时反复做 DNS 解析
+_URL_HOST_VERDICT = {}
+
+
+def _host_is_public(host):
+    """判断 host（域名或 IP 字面量）是否全部解析到公网地址。"""
+    if host in _URL_HOST_VERDICT:
+        return _URL_HOST_VERDICT[host]
+    ok = True
+    for info in socket.getaddrinfo(host, None):
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            ok = False
+            break
+        # IPv4-mapped IPv6 按其映射的 IPv4 判断
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+        if (ip.is_loopback or ip.is_private or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            ok = False
+            break
+    _URL_HOST_VERDICT[host] = ok
+    return ok
+
+
+def validate_public_http_url(url, label="URL"):
+    """服务端发起请求前的 URL 安全校验（SSRF 防护）。
+
+    规则：仅允许 http/https；host 解析结果不得包含 localhost / 环回 /
+    私有 / 保留地址。校验失败时打印原因并退出。
+    """
+    def _reject(reason):
+        print(f"❌ {label} 校验失败，已拒绝请求：{reason}")
+        print(f"   URL: {str(url)[:120]}")
+        sys.exit(1)
+
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        _reject("URL 无法解析")
+        return
+    if parts.scheme not in ("http", "https"):
+        _reject(f"仅允许 http/https 协议（收到: {parts.scheme or '无 scheme'}）")
+    host = parts.hostname
+    if not host:
+        _reject("缺少 host")
+        return
+    try:
+        if not _host_is_public(host):
+            _reject(f"host {host} 指向本机 / 环回 / 私有 / 保留地址")
+    except (socket.gaierror, OSError) as e:
+        _reject(f"host {host} 无法解析（{e}）")
+
+
 def build_headers(api_key, extra=None):
     """构造 Agnes API 的标准请求头。
 
@@ -140,6 +201,7 @@ def http_post_json(api_key, url, payload, timeout=120):
     Returns:
         dict: 解析后的 JSON 响应
     """
+    validate_public_http_url(url, label="请求 URL")
     try:
         response = requests.post(
             url,
@@ -165,6 +227,7 @@ def http_get_json(api_key, url, params=None, timeout=60):
     Returns:
         dict | None
     """
+    validate_public_http_url(url, label="请求 URL")
     try:
         response = requests.get(
             url,
@@ -193,6 +256,7 @@ def download_file(file_url, output_path, label="文件"):
     """
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
+    validate_public_http_url(file_url, label="下载 URL")
 
     try:
         print(f"\n📥 下载{label}到 {output} ...")

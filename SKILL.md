@@ -205,9 +205,9 @@ python scripts/agnes_image_to_video.py "平滑过渡" \
 `Agnes Video 2.5`（`agnes-video-2.5`）与 `Agnes Video 2.5 Flash`（`agnes-video-2.5-flash`）共用 OpenAI Videos 兼容接口，参数体系为 `mode / seconds / size / aspect_ratio`，与 V2.0 不兼容。
 
 - 两个模型支持三种生成模式：`text`（文生视频）、`keyframe`（首尾帧控制）、`reference`（多模态参考：图片 / 音频 / 视频）
-- 查询任务推荐使用 `video_id` + `model_name` 组合（所有模式都带 `model_name`）
-- **Flash 专属约束**：`size` 仅支持 `"720P"`；`reference` 模式 `images` 最多 5 张；`reference` 模式不支持 `videos`（传入有效内容返回 HTTP 400）。校验失败不产生任务、不计费。
-- Flash 当前限时免费（输出 `$0 / 秒`）
+- 查询任务推荐使用 `video_id` + `model_name` 组合（所有模式都带 `model_name`；不带 `model_name` 的纯 `video_id` 查询仅适用于 `mode: "text"` 的任务）
+- **Flash 专属约束**：`size` 仅支持 `"720P"`；`reference` 模式 `images` 最多 5 张、`audios` 最多 3 段；`reference` 模式不支持 `videos`（传入有效内容返回 HTTP 400）。校验失败不产生任务、不计费。
+- Flash 原价 $0.025 / 秒，当前限时免费（现价 `$0 / 秒`）
 
 **调用方式总览**：
 
@@ -242,7 +242,7 @@ python scripts/agnes_image_to_video_25.py "参考 <Video 1> 改成月夜卧室" 
 | `--size` | 全部 2.5 | 分辨率档位：`720P` / `960P` / `2K`（Flash 仅 `720P`） | `720P` |
 | `--aspect-ratio` | 全部 2.5 | 画幅：`21:9` / `16:9` / `4:3` / `1:1` / `3:4` / `9:16` | `16:9` |
 | `--seed` | 全部 2.5 | 随机种子（相同种子提高可复现性） | 无 |
-| `--poll-interval` | 全部 2.5 | 轮询间隔秒数（文档建议 1–2 秒） | `3` |
+| `--poll-interval` | 全部 2.5 | 轮询间隔秒数（官方建议 1–2 秒） | `2` |
 | `--max-wait` | 全部 2.5 | 最长等待秒数 | `600` |
 
 **画幅与输出像素对照**（size 仅决定分辨率档位，实际像素由 aspect_ratio 决定）：
@@ -250,11 +250,13 @@ python scripts/agnes_image_to_video_25.py "参考 <Video 1> 改成月夜卧室" 
 | aspect_ratio | 720P 输出像素 | 960P / 2K 按比例放大 |
 |--------------|---------------|----------------------|
 | `21:9` | 1680×720 | 同比例 |
-| `16:9` | 1280×720 | 同比例 |
+| `16:9` | 1280×704 | 同比例 |
 | `4:3` | 960×720 | 同比例 |
 | `1:1` | 720×720 | 同比例 |
 | `3:4` | 720×960 | 同比例 |
 | `9:16` | 720×1280 | 同比例 |
+
+> 官方文档 2026 年 9 月实测 Flash 720P 的 `16:9` 输出为 1280×704（而非 1280×720），实际以生成文件为准。
 
 ### 模式一：文生视频（mode=text）
 
@@ -286,7 +288,7 @@ python scripts/agnes_image_to_video_25.py "人物从首帧姿态自然转身走�
 
 - 提示词中以 `<Picture N>` / `<Audio N>` / `<Video N>` 引用第 N 个素材（从 1 计数，按参数出现顺序）
 - 参考视频用 `--video URL` 传入，可用 `--video-start`（起始秒，默认 0）与 `--video-require-audio`（要求原片带音轨）统一控制
-- Flash 模型不支持 `videos`，且 `images` 最多 5 张
+- Flash 模型不支持 `videos`，`images` 最多 5 张、`audios` 最多 3 段
 
 ```bash
 # 图片参考（角色一致性）
@@ -325,7 +327,7 @@ python scripts/agnes_image_to_video_25.py "以 <Picture 1> 风格生成角色奔
 | `--width / --height` | 视频类 | 视频分辨率 | `1152 / 768` |
 | `--seed` | 视频类 | 随机种子（可选） | 无 |
 | `--keyframes` | 图生视频 | 启用关键帧动画模式 | 关闭 |
-| `--poll-interval` | 视频类 | 轮询间隔秒数 | `5` |
+| `--poll-interval` | 视频类 | 轮询间隔秒数（V2.0 默认 5 / 2.5 默认 2） | `5` / `2` |
 | `--max-wait` | 视频类 | 最长等待秒数 | `600` |
 | `--seconds` | 视频 2.5 | 视频时长（字符串 `"4"`–`"12"`） | `5` |
 | `--size` | 视频 2.5 | 分辨率档位 `720P` / `960P` / `2K`（Flash 仅 `720P`，与图片类的像素尺寸含义不同） | `720P` |
@@ -481,5 +483,5 @@ agnes_common.py          } 通用工具（底层基础层）
 - 视频生成是**异步任务**，脚本会自动轮询等待，通常需要 1–3 分钟
 - 图生视频（`image-to-video`）的输入图片必须是公网可访问的 URL，不支持本地文件直接上传
 - **视频 2.5 / 2.5 Flash**：`keyframe` / `reference` 模式下的 `first_frame` / `last_frame` / `images` / `audios` / `videos` 全部要求公网可访问 URL，且在任务完成前保持有效；`reference` 模式提示词用 `<Picture N>` / `<Audio N>` / `<Video N>` 引用素材
-- **视频 2.5 Flash 限制**：`size` 仅 `720P`、`reference.images` 最多 5 张、`reference` 不支持 `videos`；违反时脚本直接拒绝（不创建任务、不计费）
+- **视频 2.5 Flash 限制**：`size` 仅 `720P`、`reference.images` 最多 5 张、`reference.audios` 最多 3 段、`reference` 不支持 `videos`；违反时脚本直接拒绝（不创建任务、不计费）
 - 建议将 API Key 写入 `.env` 文件，避免在命令行中泄漏
